@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.schemas.auth import UserRegister, UserResponse
+from app.api.deps import get_current_user
+from app.schemas.auth import TokenResponse, UserLogin, UserRegister, UserResponse
 from app.services.auth_service import AuthService
 
 router = APIRouter()
@@ -18,3 +19,27 @@ async def register_user(user: UserRegister):
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error)
         )
+
+@router.post(
+    "/login",
+    response_model=TokenResponse
+)
+async def login_user(user: UserLogin):
+    try:
+        return await AuthService.login_user(user)
+
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse
+)
+async def get_me(
+    current_user: dict = Depends(get_current_user)
+):
+    return current_user
