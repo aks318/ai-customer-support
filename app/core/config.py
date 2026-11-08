@@ -8,6 +8,9 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "development"
 
+    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_DATABASE: str = "ai_customer_support"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore"
