@@ -11,3 +11,15 @@ async def generate_response(messages: list[dict]) -> str:
 
     return response.message.content
 
+async def generate_response_stream(messages: list[dict]):
+    stream = await client.chat(
+        model=settings.OLLAMA_MODEL,
+        messages=messages,
+        stream=True
+    )
+
+    async for chunk in stream:
+        content = chunk.message.content
+
+        if content:
+            yield content
