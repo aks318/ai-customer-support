@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, conversations, health, messages
+from app.api.v1.endpoints import auth, chat, conversations, health, messages
 
 router = APIRouter()
 
@@ -25,4 +25,10 @@ router.include_router(
     messages.router,
     prefix="/conversations",
     tags=["Messages"]
+)
+
+router.include_router(
+    chat.router,
+    prefix="/conversations",
+    tags=["AI Chat"]
 )
