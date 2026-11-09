@@ -6,6 +6,11 @@ from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
 
 from app.ai.llm import generate_response_stream
+from app.ai.exceptions import (
+    LLMConnectionError,
+    LLMTimeoutError,
+    LLMProviderError,
+)
 
 class ChatService:
 
@@ -149,14 +154,41 @@ class ChatService:
                 f"data: {json.dumps({'message': assistant_message}, default=str)}\n\n"
             )
 
-        except Exception:
-             # Don't expose internal exception details to the client
+        except LLMTimeoutError:
             await MessageRepository.update_generation(
                 message_id=assistant_message["id"],
                 status="failed",
                 content=full_response
             )
+
             yield (
                 "event: error\n"
-                f"data: {json.dumps({'message': 'Unable to generate a response'})}\n\n"
+                'data: {"code": "timeout", '
+                '"message": "AI response timed out"}\n\n'
+            )
+
+        except LLMConnectionError:
+            await MessageRepository.update_generation(
+                message_id=assistant_message["id"],
+                status="failed",
+                content=full_response
+            )
+
+            yield (
+                "event: error\n"
+                'data: {"code": "unavailable", '
+                '"message": "AI service unavailable"}\n\n'
+            )
+
+        except Exception:
+            await MessageRepository.update_generation(
+                message_id=assistant_message["id"],
+                status="failed",
+                content=full_response
+            )
+
+            yield (
+                "event: error\n"
+                'data: {"code": "generation_failed", '
+                '"message": "Unable to generate response"}\n\n'
             )

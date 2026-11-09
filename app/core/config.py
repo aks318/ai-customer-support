@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2:1b"  # Replace with your installed model tag
+    LLM_TIMEOUT_SECONDS: int = 120
 
     model_config = SettingsConfigDict(
         env_file=".env",

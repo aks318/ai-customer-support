@@ -4,6 +4,12 @@ from app.api.deps import get_current_user
 from app.schemas.message import ChatRequest, ChatResponse
 from app.services.chat_service import ChatService
 
+from app.ai.exceptions import (
+    LLMConnectionError,
+    LLMTimeoutError,
+    LLMProviderError,
+)
+
 router = APIRouter()
 
 
@@ -16,11 +22,30 @@ async def chat(
     data: ChatRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    result = await ChatService.send_message(
-        conversation_id=conversation_id,
-        user_id=current_user["id"],
-        content=data.content
-    )
+    try:
+        result = await ChatService.send_message(
+            conversation_id=conversation_id,
+            user_id=current_user["id"],
+            content=data.content
+        )
+
+    except LLMTimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="AI response generation timed out"
+        )
+
+    except LLMConnectionError:
+        raise HTTPException(
+            status_code=503,
+            detail="AI service is currently unavailable"
+        )
+
+    except LLMProviderError:
+        raise HTTPException(
+            status_code=502,
+            detail="AI service failed to generate a response"
+        )
 
     if result is None:
         raise HTTPException(
