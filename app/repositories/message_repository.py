@@ -11,7 +11,8 @@ class MessageRepository:
     async def create(
         conversation_id: str,
         role: str,
-        content: str
+        content: str,
+        status: str = "completed"
     ):
         database = MongoDB.database
 
@@ -24,6 +25,7 @@ class MessageRepository:
             "conversation_id": ObjectId(conversation_id),
             "role": role,
             "content": content,
+            "status": status,
             "created_at": now
         }
 
@@ -39,6 +41,7 @@ class MessageRepository:
             "conversation_id": conversation_id,
             "role": role,
             "content": content,
+            "status": status,
             "created_at": now
         }
 
@@ -61,7 +64,48 @@ class MessageRepository:
                 "conversation_id": str(item["conversation_id"]),
                 "role": item["role"],
                 "content": item["content"],
+                "status": item.get("status", "completed"),
                 "created_at": item["created_at"]
             })
 
         return messages
+
+    @staticmethod
+    async def update_generation(
+        message_id: str,
+        status: str,
+        content: str
+    ):
+        database = MongoDB.database
+
+        if database is None:
+            raise RuntimeError("MongoDB is not connected")
+
+        if not ObjectId.is_valid(message_id):
+            return None
+
+        result = await database.messages.find_one_and_update(
+            {
+                "_id": ObjectId(message_id),
+                "role": "assistant"
+            },
+            {
+                "$set": {
+                    "status": status,
+                    "content": content
+                }
+            },
+            return_document=True
+        )
+
+        if not result:
+            return None
+
+        return {
+            "id": str(result["_id"]),
+            "conversation_id": str(result["conversation_id"]),
+            "role": result["role"],
+            "content": result["content"],
+            "status": result["status"],
+            "created_at": result["created_at"]
+        }

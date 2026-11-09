@@ -13,6 +13,7 @@ class MessageResponse(BaseModel):
     conversation_id: str
     role: Literal["user", "assistant"]
     content: str
+    status: Literal["pending", "completed", "failed"] = "completed"
     created_at: datetime
 
 class ChatRequest(BaseModel):

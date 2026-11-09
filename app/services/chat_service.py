@@ -32,6 +32,8 @@ class ChatService:
             content=content
         )
 
+        print("user_message", user_message)
+
         # 3. Retrieve conversation history
         history = await MessageRepository.get_history(conversation_id)
 
@@ -58,8 +60,28 @@ class ChatService:
         assistant_message = await MessageRepository.create(
             conversation_id=conversation_id,
             role="assistant",
-            content=answer
+            content="",
+            status="pending"
         )
+
+        print("assistant_message", assistant_message)
+
+        try:
+            answer = await generate_response(messages)
+
+            assistant_message = await MessageRepository.update_generation(
+                message_id=assistant_message["id"],
+                status="completed",
+                content=answer
+            )
+
+        except Exception:
+            await MessageRepository.update_generation(
+                message_id=assistant_message["id"],
+                status="failed",
+                content=""
+            )
+            raise
 
         return {
             "user_message": user_message,
@@ -98,6 +120,13 @@ class ChatService:
             for message in history
         ])
 
+        assistant_message = await MessageRepository.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="",
+            status="pending"
+        )
+
         # Accumulate the complete response
         full_response = ""
 
@@ -109,9 +138,9 @@ class ChatService:
                     f"data: {json.dumps({"token" : token})}\n\n"
                 )
             # Persist the completed assistant response
-            assistant_message = await MessageRepository.create(
-                conversation_id=conversation_id,
-                role="assistant",
+            assistant_message = await MessageRepository.update_generation(
+                message_id=assistant_message["id"],
+                status="completed",
                 content=full_response
             )
 
@@ -122,6 +151,11 @@ class ChatService:
 
         except Exception:
              # Don't expose internal exception details to the client
+            await MessageRepository.update_generation(
+                message_id=assistant_message["id"],
+                status="failed",
+                content=full_response
+            )
             yield (
                 "event: error\n"
                 f"data: {json.dumps({'message': 'Unable to generate a response'})}\n\n"
