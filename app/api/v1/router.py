@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, chat, chat_stream, conversations, health, messages
+from app.api.v1.endpoints import auth, chat, chat_stream, conversations, health, messages, retry
 
 router = APIRouter()
 
@@ -37,4 +37,10 @@ router.include_router(
     chat_stream.router,
     prefix="/conversations",
     tags=["AI Chat Streaming"]
+)
+
+router.include_router(
+    retry.router,
+    prefix="/conversations",
+    tags=["Message Retry"]
 )

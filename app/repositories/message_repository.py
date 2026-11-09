@@ -4,6 +4,8 @@ from bson import ObjectId
 
 from app.db.mongodb import MongoDB
 
+from pymongo import ReturnDocument
+
 
 class MessageRepository:
 
@@ -42,6 +44,7 @@ class MessageRepository:
             "role": role,
             "content": content,
             "status": status,
+            "retry_count": 0 if role == "assistant" else 0,
             "created_at": now
         }
 
@@ -108,4 +111,54 @@ class MessageRepository:
             "content": result["content"],
             "status": result["status"],
             "created_at": result["created_at"]
+        }
+
+    @staticmethod
+    async def claim_failed_retry(
+        conversation_id: str,
+        message_id: str,
+        max_retries: int = 3
+    ):
+        database = MongoDB.database
+
+        if database is None:
+            raise RuntimeError("MongoDB is not connected")
+
+        if not ObjectId.is_valid(message_id):
+            return None
+
+        message = await database.messages.find_one_and_update(
+            {
+                "_id": ObjectId(message_id),
+                "conversation_id": ObjectId(conversation_id),
+                "role": "assistant",
+                "status": "failed",
+                "$or": [
+                    {"retry_count": {"$lt": max_retries}},
+                    {"retry_count": {"$exists": False}}
+                ]
+            },
+            {
+                "$set": {
+                    "status": "pending",
+                    "content": ""
+                },
+                "$inc": {
+                    "retry_count": 1
+                }
+            },
+            return_document=ReturnDocument.AFTER
+        )
+
+        if not message:
+            return None
+
+        return {
+            "id": str(message["_id"]),
+            "conversation_id": str(message["conversation_id"]),
+            "role": message["role"],
+            "content": message["content"],
+            "status": message["status"],
+            "retry_count": message["retry_count"],
+            "created_at": message["created_at"]
         }

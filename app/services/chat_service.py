@@ -192,3 +192,81 @@ class ChatService:
                 'data: {"code": "generation_failed", '
                 '"message": "Unable to generate response"}\n\n'
             )
+
+    @staticmethod
+    async def retry_message(
+        conversation_id: str,
+        user_id: str,
+        message_id: str
+    ):
+        # 1. Validate conversation ownership
+        conversation = await ConversationRepository.get_by_id(
+            conversation_id,
+            user_id
+        )
+
+        if not conversation:
+            return None
+
+        # 2. Atomically claim the failed message
+        assistant_message = await MessageRepository.claim_failed_retry(
+            conversation_id=conversation_id,
+            message_id=message_id,
+            max_retries=3
+        )
+
+        if not assistant_message:
+            raise ValueError(
+                "Message cannot be retried or retry limit exceeded"
+            )
+
+        # 3. Retrieve conversation history
+        history = await MessageRepository.get_history(conversation_id)
+
+        # 4. Exclude the failed assistant message and anything after it
+        message_index = next(
+            (
+                index
+                for index, message in enumerate(history)
+                if message["id"] == message_id
+            ),
+            None
+        )
+
+        if message_index is None:
+            raise RuntimeError("Message not found in conversation history")
+
+        previous_history = history[:message_index]
+
+        messages = [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT
+            }
+        ]
+
+        messages.extend([
+            {
+                "role": message["role"],
+                "content": message["content"]
+            }
+            for message in previous_history
+        ])
+
+        # 5. Generate and update the existing assistant message
+        try:
+            answer = await generate_response(messages)
+
+            return await MessageRepository.update_generation(
+                message_id=message_id,
+                status="completed",
+                content=answer
+            )
+
+        except Exception:
+            await MessageRepository.update_generation(
+                message_id=message_id,
+                status="failed",
+                content=""
+            )
+            raise
