@@ -2,6 +2,7 @@ import json
 
 from app.ai.llm import generate_response
 from app.ai.prompts import SYSTEM_PROMPT
+from app.ai.titles import generate_conversation_title
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
 
@@ -69,7 +70,12 @@ class ChatService:
             status="pending"
         )
 
-        print("assistant_message", assistant_message)
+        await ChatService.generate_title_if_needed(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            user_message=content,
+            history=history,
+        )
 
         try:
             answer = await generate_response(messages)
@@ -270,3 +276,30 @@ class ChatService:
                 content=""
             )
             raise
+
+
+    @staticmethod
+    async def generate_title_if_needed(
+        conversation_id: str,
+        user_id: str,
+        user_message: str,
+        history: list,
+    ):
+        # History contains the newly saved user message.
+        if len(history) != 1:
+            return
+
+        try:
+            title = await generate_conversation_title(user_message)
+
+            print("title", title)
+
+            await ConversationRepository.update_title(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                title=title,
+            )
+
+        except Exception:
+            # Title generation must never break the actual chat.
+            pass

@@ -96,3 +96,26 @@ class ConversationRepository:
         })
 
         return result.deleted_count > 0
+
+    @staticmethod
+    async def update_title(
+        conversation_id: str,
+        user_id: str,
+        title: str,
+    ):
+        from bson import ObjectId
+
+        result = await MongoDB.database.conversations.update_one(
+            {
+                "_id": ObjectId(conversation_id),
+                "user_id": ObjectId(user_id),
+            },
+            {
+                "$set": {
+                    "title": title,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+
+        return result.modified_count > 0
